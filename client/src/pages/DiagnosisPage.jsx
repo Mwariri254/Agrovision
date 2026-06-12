@@ -275,32 +275,44 @@ function ResultCard({ result, onReset, onAskDisease }) {
               <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' }} />
             )}
             <svg style={{ width: '100%', height: '100%', position: 'absolute', inset: 0 }} viewBox="0 0 400 280" preserveAspectRatio="xMidYMid slice">
-              {/* Heat regions based on affected area */}
-              {Array.from({ length: 8 }).map((_, i) => {
-                const angle = (i / 8) * Math.PI * 2
-                const dist = 40 + (result.affected_area_pct / 100) * 30
-                const x = 200 + Math.cos(angle) * dist
-                const y = 140 + Math.sin(angle) * dist
-                const intensity = Math.max(0, 1 - (i / 8) * 0.3)
-                const heatColor = result.disease_result === 'late_blight' ? '#f87171' : '#f59e0b'
-                return (
-                  <circle key={i} cx={x} cy={y} r="45" fill={heatColor} opacity={intensity * 0.45} filter="url(#glow)" />
-                )
-              })}
+              {(() => {
+                const seed = [...(result.id || 'default')].reduce((acc, c) => acc + c.charCodeAt(0), 0)
+                let s = seed
+                const rand = () => {
+                  s = (s * 9301 + 49297) % 233280
+                  return s / 233280
+                }
+                
+                const isLateBlight = result.disease_result === 'late_blight'
+                const numSpots = Math.max(4, Math.min(16, Math.round((result.affected_area_pct / 100) * 16)))
+                
+                return Array.from({ length: numSpots }).map((_, i) => {
+                  const x = 120 + rand() * 160
+                  const y = 80 + rand() * 120
+                  const baseRadius = 25 + rand() * 30
+                  const r = baseRadius * (0.4 + (result.affected_area_pct / 100) * 0.8)
+                  const opacity = 0.2 + rand() * 0.35
+                  
+                  const colorSeed = rand()
+                  const heatColor = isLateBlight 
+                    ? (colorSeed > 0.4 ? '#ef4444' : '#f87171')
+                    : (colorSeed > 0.5 ? '#f59e0b' : colorSeed > 0.25 ? '#f97316' : '#fbbf24')
+                  
+                  return (
+                    <circle key={i} cx={x} cy={y} r={r} fill={heatColor} opacity={opacity} filter="url(#blur-heat)" />
+                  )
+                })
+              })()}
               
               {/* Severity indicator */}
-              <text x="200" y="45" textAnchor="middle" style={{ fontSize: 15, fontWeight: 700, fill: '#ffffff', opacity: 0.9, filter: 'drop-shadow(0px 2px 4px rgba(0,0,0,0.8))' }}>
+              <text x="200" y="45" textAnchor="middle" style={{ fontSize: 14, fontWeight: 700, fill: '#ffffff', opacity: 0.95, filter: 'drop-shadow(0px 2px 5px rgba(0,0,0,0.95))', fontFamily: 'system-ui, sans-serif' }}>
                 AI Scan Overlay: {result.affected_area_pct}% coverage
               </text>
               
-              {/* Glow filter */}
+              {/* Glow/Blur filter for thermal effect */}
               <defs>
-                <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-                  <feGaussianBlur stdDeviation="12" result="coloredBlur" />
-                  <feMerge>
-                    <feMergeNode in="coloredBlur" />
-                    <feMergeNode in="SourceGraphic" />
-                  </feMerge>
+                <filter id="blur-heat" x="-50%" y="-50%" width="200%" height="200%">
+                  <feGaussianBlur stdDeviation="16" />
                 </filter>
               </defs>
             </svg>

@@ -15,6 +15,7 @@ client/dist/
 **/*.h5
 **/*.pt
 **/*.pkl
+!ai_engine/potato_disease_model.h5
 
 # Zip archives
 *.zip
