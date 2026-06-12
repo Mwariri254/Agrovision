@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { Camera, Upload, X, Leaf, AlertTriangle, CheckCircle, Zap, ChevronDown, Clock, RefreshCw, Zap as HeatIcon } from 'lucide-react'
+import { Camera, Upload, X, Leaf, AlertTriangle, CheckCircle, Zap, ChevronDown, Clock, RefreshCw, Download } from 'lucide-react'
 import API_BASE from '../api.js'
 
 const DISEASE_INFO = {
@@ -43,6 +43,59 @@ const DISEASE_INFO = {
   },
 }
 
+// --- GPS Helper ---
+// Returns { lat, lng } or null if denied / unavailable / timed out
+const getCoordinates = () =>
+  new Promise((resolve) => {
+    if (!navigator.geolocation) return resolve(null)
+
+    const timeout = setTimeout(() => resolve(null), 5000)
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        clearTimeout(timeout)
+        resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+      },
+      () => {
+        clearTimeout(timeout) // denied or failed → scan proceeds anyway
+        resolve(null)
+      },
+      { enableHighAccuracy: true, timeout: 5000 }
+    )
+  })
+// ------------------
+
+// --- AI Processing Matrix Component ---
+const ProcessingMatrix = () => {
+  const [step, setStep] = useState(0)
+  const steps = [
+    '> Initializing AI neural network...',
+    '> Extracting leaf morphological features...',
+    '> Running Grad-CAM activation mapping...',
+    '> Calculating disease severity index...',
+    '> Finalizing diagnostic report...',
+  ]
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setStep((prev) => (prev < steps.length - 1 ? prev + 1 : prev))
+    }, 800)
+    return () => clearInterval(interval)
+  }, [])
+
+  return (
+    <div style={{ textAlign: 'left', padding: '15px 20px', background: '#0a0a0a', borderRadius: 8, border: '1px solid #333' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+        <span className="spinner" style={{ width: 14, height: 14, borderColor: '#4ade80', borderBottomColor: 'transparent', borderWidth: 2 }} />
+        <span style={{ color: '#4ade80', fontFamily: 'monospace', fontSize: 13, fontWeight: 700 }}>SYSTEM ACTIVE</span>
+      </div>
+      <p style={{ fontFamily: 'monospace', color: '#4ade80', fontSize: 13, margin: 0, opacity: 0.9 }}>
+        {steps[step]}
+      </p>
+    </div>
+  )
+}
+
 function ConfidenceRing({ value, color }) {
   const r = 36
   const circ = 2 * Math.PI * r
@@ -58,10 +111,78 @@ function ConfidenceRing({ value, color }) {
   )
 }
 
-function ResultCard({ result, onReset }) {
+function ResultCard({ result, onReset, onAskDisease }) {
   const info = DISEASE_INFO[result.disease_result] || DISEASE_INFO.healthy
   const [expanded, setExpanded] = useState({ symptoms: true, treatment: false, prevention: false })
   const toggle = k => setExpanded(e => ({ ...e, [k]: !e[k] }))
+
+  const downloadPDFReport = () => {
+    const printWindow = window.open('', '_blank')
+    const date = new Date().toLocaleString()
+    const html = `
+      <html>
+        <head>
+          <title>Agrovision Lab Report - ${result.id || 'Scan'}</title>
+          <style>
+            body { font-family: system-ui, sans-serif; color: #1a1a1a; padding: 40px; max-width: 800px; margin: 0 auto; }
+            .header { border-bottom: 2px solid #e5e7eb; padding-bottom: 20px; margin-bottom: 30px; }
+            .title { color: #166534; margin: 0; font-size: 28px; }
+            .badge { display: inline-block; padding: 6px 12px; background: ${info.bg}; color: ${info.color}; border: 1px solid ${info.border}; border-radius: 6px; font-weight: bold; font-size: 18px; margin-top: 10px; }
+            .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
+            .box { padding: 15px; background: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb; }
+            .label { font-size: 12px; color: #6b7280; text-transform: uppercase; font-weight: bold; margin-bottom: 5px; }
+            .val { font-size: 16px; font-weight: bold; margin: 0; text-transform: capitalize; }
+            .heatmap { max-width: 100%; max-height: 400px; border-radius: 8px; border: 2px solid #e5e7eb; margin-top: 10px; object-fit: contain; }
+            h3 { border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; margin-top: 30px; }
+            ul { padding-left: 20px; }
+            li { margin-bottom: 8px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1 class="title">Agrovision AI Diagnostic Report</h1>
+            <p style="color: #6b7280; margin-top: 5px;">Generated on: ${date}</p>
+            ${result.latitude && result.longitude
+              ? `<p style="color: #6b7280; font-size: 13px; margin-top: 4px;">📍 Location: ${parseFloat(result.latitude).toFixed(5)}, ${parseFloat(result.longitude).toFixed(5)}</p>`
+              : ''}
+          </div>
+          
+          <div class="badge">${info.icon} ${info.label} (${Math.round(result.confidence)}% Confidence)</div>
+          
+          <div class="grid" style="margin-top: 20px;">
+            <div class="box">
+              <div class="label">Severity Level</div>
+              <p class="val" style="color: ${info.color}">${result.severity}</p>
+            </div>
+            <div class="box">
+              <div class="label">Affected Leaf Area</div>
+              <p class="val">${result.affected_area_pct}%</p>
+            </div>
+          </div>
+
+          ${result.heatmap ? `
+            <h3>AI X-Ray (Grad-CAM Analysis)</h3>
+            <img src="${result.heatmap}" class="heatmap" />
+            <p style="font-size: 12px; color: #6b7280;">* Red/yellow zones indicate the exact pixel clusters the AI identified as diseased tissue.</p>
+          ` : ''}
+
+          <h3>Recommended Treatment Plan</h3>
+          <ul>
+            ${info.treatment.map(t => `<li>${t}</li>`).join('')}
+          </ul>
+
+          <div style="margin-top: 50px; padding-top: 20px; border-top: 1px dashed #ccc; font-size: 12px; color: #9ca3af; text-align: center;">
+            This is an AI-generated preliminary diagnostic report. Please consult with a certified agronomist for official verification.
+          </div>
+          <script>
+            window.onload = () => { setTimeout(() => { window.print(); window.close(); }, 500); }
+          </script>
+        </body>
+      </html>
+    `
+    printWindow.document.write(html)
+    printWindow.document.close()
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -79,7 +200,7 @@ function ResultCard({ result, onReset }) {
             <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 8, lineHeight: 1.6 }}>{info.description}</p>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 12, color: 'var(--text3)', background: 'var(--bg3)', padding: '3px 10px', borderRadius: 6 }}>
-                Severity: <strong style={{ color: info.color }}>{info.severity}</strong>
+                Severity: <strong style={{ color: info.color, textTransform: 'capitalize' }}>{result.severity}</strong>
               </span>
               {result.affected_area_pct > 0 && (
                 <span style={{ fontSize: 12, color: 'var(--text3)', background: 'var(--bg3)', padding: '3px 10px', borderRadius: 6 }}>
@@ -91,59 +212,31 @@ function ResultCard({ result, onReset }) {
                   {info.pathogen}
                 </span>
               )}
+              {/* --- GPS COORDINATES BADGE (shown only when available) --- */}
+              {result.latitude && result.longitude && (
+                <span style={{ fontSize: 12, color: 'var(--text3)', background: 'var(--bg3)', padding: '3px 10px', borderRadius: 6 }}>
+                  📍 {parseFloat(result.latitude).toFixed(4)}, {parseFloat(result.longitude).toFixed(4)}
+                </span>
+              )}
+              {/* -------------------------------------------------------- */}
             </div>
           </div>
-          <button className="btn btn-secondary" onClick={onReset} style={{ padding: '8px 14px', flexShrink: 0 }}>
-            <RefreshCw size={14} /> New Scan
-          </button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flexShrink: 0, minWidth: 160 }}>
+            <button className="btn btn-secondary" onClick={onReset} style={{ padding: '8px 14px' }}>
+              <RefreshCw size={14} /> New Scan
+            </button>
+            <button className="btn btn-secondary" onClick={downloadPDFReport} style={{ padding: '8px 14px', background: 'var(--bg3)', border: '1px solid var(--border)' }}>
+              <Download size={14} /> PDF Report
+            </button>
+            {result.disease_result !== 'healthy' && onAskDisease && (
+              <button className="btn btn-primary" onClick={() => onAskDisease(result.disease_result)} style={{ padding: '8px 14px' }}>
+                Ask about this disease
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Grad-CAM Heatmap Visualization */}
-      {result.affected_area_pct > 0 && result.disease_result !== 'healthy' && (
-        <div className="card" style={{ padding: '18px 22px', marginBottom: 16 }}>
-          <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}
-            ><Zap size={14} color="var(--warning)" /> AI Grad-CAM Heat Map</h3>
-          <div style={{ position: 'relative', borderRadius: 12, overflow: 'hidden', background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', height: 280, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <svg style={{ width: '100%', height: '100%', position: 'absolute', inset: 0 }} viewBox="0 0 400 280" preserveAspectRatio="xMidYMid slice">
-              {/* Background leaf shape */}
-              <ellipse cx="200" cy="140" rx="120" ry="100" fill="rgba(255,255,255,0.05)" />
-              
-              {/* Heat regions based on affected area */}
-              {Array.from({ length: 8 }).map((_, i) => {
-                const angle = (i / 8) * Math.PI * 2
-                const dist = 60 + (result.affected_area_pct / 100) * 40
-                const x = 200 + Math.cos(angle) * dist
-                const y = 140 + Math.sin(angle) * dist
-                const intensity = Math.max(0, 1 - (i / 8) * 0.3)
-                const heatColor = result.disease_result === 'late_blight' ? '#f87171' : '#f59e0b'
-                return (
-                  <circle key={i} cx={x} cy={y} r="45" fill={heatColor} opacity={intensity * 0.4} filter="url(#glow)" />
-                )
-              })}
-              
-              {/* Severity indicator */}
-              <text x="200" y="50" textAnchor="middle" style={{ fontSize: 18, fontWeight: 700, fill: info.color, opacity: 0.8 }}>
-                {result.affected_area_pct}% coverage
-              </text>
-              
-              {/* Glow filter */}
-              <defs>
-                <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-                  <feGaussianBlur stdDeviation="8" result="coloredBlur" />
-                  <feMerge>
-                    <feMergeNode in="coloredBlur" />
-                    <feMergeNode in="SourceGraphic" />
-                  </feMerge>
-                </filter>
-              </defs>
-            </svg>
-          </div>
-          <p style={{ fontSize: 12, color: 'var(--text3)', marginTop: 12, lineHeight: 1.5 }}>
-            <strong>Grad-CAM Visualization:</strong> Red/orange regions show where the AI model detected disease symptoms. Darker areas indicate higher confidence in disease detection. Use this to identify affected leaf regions for targeted treatment.
-          </p>
-        </div>
-      )}
       {result.heatmap && (
         <div className="card" style={{ overflow: 'hidden', padding: 0, border: `2px solid ${info.color}40` }}>
           <div style={{ padding: '12px 18px', background: 'var(--bg3)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -153,10 +246,10 @@ function ResultCard({ result, onReset }) {
             </span>
           </div>
           <div style={{ position: 'relative', background: '#000' }}>
-            <img 
-              src={result.heatmap} 
-              alt="AI Diagnostic Heatmap" 
-              style={{ width: '100%', maxHeight: 380, objectFit: 'contain', display: 'block' }} 
+            <img
+              src={result.heatmap}
+              alt="AI Diagnostic Heatmap"
+              style={{ width: '100%', maxHeight: 380, objectFit: 'contain', display: 'block' }}
             />
             <div style={{ position: 'absolute', bottom: 12, left: 16, background: 'rgba(0,0,0,0.7)', padding: '4px 10px', borderRadius: 6 }}>
               <p style={{ fontSize: 11, fontWeight: 600, color: '#fff', margin: 0 }}>
@@ -166,7 +259,6 @@ function ResultCard({ result, onReset }) {
           </div>
         </div>
       )}
-      {/* -------------------------------------- */}
 
       {[
         { key: 'symptoms', label: 'Symptoms Detected', icon: <AlertTriangle size={14} />, items: info.symptoms, color: '#f59e0b' },
@@ -210,7 +302,7 @@ function ResultCard({ result, onReset }) {
   )
 }
 
-export default function DiagnosisPage({ user }) {
+export default function DiagnosisPage({ user, onDiseaseDetected, onAskDisease }) {
   const [image, setImage] = useState(null)
   const [preview, setPreview] = useState(null)
   const [scanning, setScanning] = useState(false)
@@ -259,25 +351,46 @@ export default function DiagnosisPage({ user }) {
     }, 'image/jpeg', 0.9)
   }
 
-  const analyze = async () => {
+  // ✅ FIXED — GPS resolves first, THEN scanning UI appears
+const analyze = async () => {
     if (!image) return
-    setScanning(true)
+
     try {
+      const coords = await getCoordinates()  // ← popup shows on clean screen
+      setScanning(true)                       // ← matrix appears after GPS done
+
       const fd = new FormData()
       fd.append('image', image)
       if (user?.id) fd.append('user_id', user.id)
+
+      // Only append coordinates when the farmer granted permission
+      if (coords) {
+        fd.append('latitude', coords.lat)
+        fd.append('longitude', coords.lng)
+      }
+
       const res = await fetch(`${API_BASE}/api/diagnosis/scan`, { method: 'POST', body: fd })
       const data = await res.json()
+
+      if (!res.ok || data.error) {
+        alert('AI SECURITY ALERT: ' + (data.error || 'Upload failed.'))
+        return
+      }
+
       setResult(data)
       setHistory(h => [data, ...h.slice(0, 9)])
+      if (data?.disease_result) {
+        onDiseaseDetected?.(data.disease_result)
+      }
     } catch {
       alert('Analysis failed. Please try again.')
     } finally {
       setScanning(false)
     }
   }
+  // ------------------------------------------------------------
 
-  const reset = () => { setImage(null); setPreview(null); setResult(null); stopCamera() }
+  const reset = () => { setImage(null); setPreview(null); setResult(null); stopCamera(); onDiseaseDetected?.(null) }
 
   return (
     <div style={{ maxWidth: 900, margin: '0 auto', padding: '28px 24px' }}>
@@ -289,7 +402,6 @@ export default function DiagnosisPage({ user }) {
       {!result ? (
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.3fr) minmax(0,1fr)', gap: 20 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            {/* Camera or upload panel */}
             {cameraActive ? (
               <div className="card" style={{ overflow: 'hidden', padding: 0 }}>
                 <video ref={videoRef} autoPlay playsInline style={{ width: '100%', display: 'block', maxHeight: 340, objectFit: 'cover', background: '#000' }} />
@@ -311,14 +423,13 @@ export default function DiagnosisPage({ user }) {
                   </button>
                 </div>
                 <div style={{ padding: 16 }}>
-                  <button className="btn btn-primary" onClick={analyze} disabled={scanning} style={{ width: '100%', padding: '13px 20px', fontSize: 15, fontWeight: 600 }}>
-                    {scanning ? (
-                      <><span className="spinner" style={{ width: 18, height: 18 }} /> Analyzing with AI...</>
-                    ) : (
-                      <><Zap size={16} /> Scan for Disease</>
-                    )}
-                  </button>
-                  {scanning && <p style={{ textAlign: 'center', color: 'var(--text3)', fontSize: 12, marginTop: 10 }}>AI model scanning for Early Blight, Late Blight...</p>}
+                  {scanning ? (
+                    <ProcessingMatrix />
+                  ) : (
+                    <button className="btn btn-primary" onClick={analyze} disabled={scanning} style={{ width: '100%', padding: '13px 20px', fontSize: 15, fontWeight: 600 }}>
+                      <Zap size={16} /> Scan for Disease
+                    </button>
+                  )}
                 </div>
               </div>
             ) : (
@@ -343,7 +454,6 @@ export default function DiagnosisPage({ user }) {
               </div>
             )}
 
-            {/* Tips */}
             <div className="card" style={{ padding: '16px 20px' }}>
               <h4 style={{ fontSize: 13, fontWeight: 600, marginBottom: 10, color: 'var(--text2)' }}>📸 Photo tips for best results</h4>
               <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 7 }}>
@@ -356,7 +466,6 @@ export default function DiagnosisPage({ user }) {
             </div>
           </div>
 
-          {/* History panel */}
           <div>
             <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 12, color: 'var(--text2)' }}>Recent Scans</h3>
             {history.length === 0 ? (
@@ -382,7 +491,6 @@ export default function DiagnosisPage({ user }) {
               </div>
             )}
 
-            {/* Disease legend */}
             <div className="card" style={{ marginTop: 14, padding: '16px 18px' }}>
               <h4 style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, color: 'var(--text2)' }}>Disease Guide</h4>
               {Object.entries(DISEASE_INFO).map(([key, info]) => (
@@ -398,7 +506,7 @@ export default function DiagnosisPage({ user }) {
           </div>
         </div>
       ) : (
-        <ResultCard result={result} onReset={reset} />
+        <ResultCard result={result} onReset={reset} onAskDisease={onAskDisease} />
       )}
     </div>
   )

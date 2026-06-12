@@ -59,6 +59,7 @@ export default function App() {
   const [showAlerts, setShowAlerts] = useState(false)
   const [seenCount, setSeenCount] = useState(0)
   const [adminPanelAction, setAdminPanelAction] = useState(null)
+  const [predictedDisease, setPredictedDisease] = useState(null)
 
   const normalizedRole = user?.role?.toString().toLowerCase()
   const isAdmin = normalizedRole === 'admin'
@@ -152,10 +153,10 @@ export default function App() {
             <div style={{ width: 32, height: 32, background: 'rgba(74,222,128,0.15)', border: '1px solid rgba(74,222,128,0.3)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Sprout size={17} color="var(--accent)" />
             </div>
-            <span style={{ fontWeight: 700, fontSize: 15 }}>AgroVision</span>
+            <span className="header-logo-text" style={{ fontWeight: 700, fontSize: 15 }}>AgroVision</span>
           </div>
 
-          <nav style={{ display: 'flex', gap: 2, flex: 1, overflowX: 'auto' }}>
+          <nav className="desktop-nav" style={{ display: 'flex', gap: 2, flex: 1, overflowX: 'auto' }}>
             {visibleNav.map(({ id, label, icon: Icon }) => (
               <button key={id} onClick={() => setPage(id)} className="btn btn-ghost" style={{
                 color: page === id ? 'var(--accent)' : 'var(--text2)',
@@ -223,11 +224,92 @@ export default function App() {
           />
         )}
         {page === 'map' && <FarmMap user={user} />}
-        {page === 'scan' && <DiagnosisPage user={user} />}
+        {page === 'scan' && <DiagnosisPage user={user} onDiseaseDetected={setPredictedDisease} onAskDisease={(disease) => { setPredictedDisease(disease); setPage('agrobot') }} />}
         {page === 'fieldlog' && <FieldLogPage user={user} />}
-        {page === 'agrobot' && <AgroBotPage />}
+        {page === 'agrobot' && <AgroBotPage disease={predictedDisease} />}
         {page === 'admin' && <AdminPanel pendingAction={adminPanelAction} onActionHandled={() => setAdminPanelAction(null)} />}
       </main>
+
+      <nav className="mobile-bottom-nav" style={{
+        display: 'none',
+        position: 'fixed',
+        bottom: 12,
+        left: 12,
+        right: 12,
+        height: 64,
+        background: 'rgba(24, 28, 39, 0.92)',
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        border: '1px solid rgba(255, 255, 255, 0.08)',
+        borderRadius: 16,
+        zIndex: 1000,
+        alignItems: 'center',
+        justifyContent: 'space-around',
+        padding: '0 8px',
+        boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.5)'
+      }}>
+        {visibleNav.map(({ id, label, icon: Icon }) => (
+          <button key={id} onClick={() => setPage(id)} style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'none',
+            border: 'none',
+            outline: 'none',
+            padding: '6px 4px',
+            cursor: 'pointer',
+            flex: 1,
+            minWidth: 0,
+            gap: 2,
+            transition: 'transform 0.15s ease'
+          }}
+          onMouseDown={e => e.currentTarget.style.transform = 'scale(0.92)'}
+          onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}
+          onTouchStart={e => e.currentTarget.style.transform = 'scale(0.92)'}
+          onTouchEnd={e => e.currentTarget.style.transform = 'scale(1)'}
+          >
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Icon size={19} color={page === id ? 'var(--accent)' : '#9aa3b8'} style={{ transition: 'color 0.2s' }} />
+              {id === 'scan' && <span style={{ position: 'absolute', top: -2, right: -2, width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)' }} />}
+              {id === 'agrobot' && <span style={{ position: 'absolute', top: -2, right: -2, width: 6, height: 6, borderRadius: '50%', background: '#60a5fa' }} />}
+            </div>
+            <span style={{
+              maxWidth: '100%',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              fontWeight: page === id ? 600 : 500,
+              color: page === id ? 'var(--accent)' : '#9aa3b8',
+              fontSize: 10,
+              transition: 'color 0.2s'
+            }}>{label}</span>
+          </button>
+        ))}
+      </nav>
+
+      <style>{`
+        .mobile-bottom-nav {
+          display: none;
+        }
+        @media (max-width: 768px) {
+          .desktop-nav {
+            display: none !important;
+          }
+          .mobile-bottom-nav {
+            display: flex !important;
+          }
+          .header-logo-text {
+            display: none !important;
+          }
+          main {
+            padding-bottom: 88px !important;
+          }
+          .chatbot-container {
+            height: calc(100vh - 120px) !important;
+          }
+        }
+      `}</style>
     </div>
   )
 }

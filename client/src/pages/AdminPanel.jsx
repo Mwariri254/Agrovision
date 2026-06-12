@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import API_BASE from '../api.js'
+import DiseaseTrendAnalytics from '../components/DiseaseTrendAnalytics.jsx'
 import { MapContainer, TileLayer, Circle, Popup } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import { Check, X, ShieldCheck, Leaf, MapPin, Package, Clock, Archive, AlertTriangle, Zap, Bell, Award, Star, Trash2, Plus, Pencil } from 'lucide-react'
@@ -750,6 +751,7 @@ export default function AdminPanel({ pendingAction, onActionHandled }) {
   const TABS = [
     { id: 'products', label: 'Products' },
     { id: 'disease', label: 'Blight Map' },
+    { id: 'analytics', label: 'Analytics' },
     { id: 'certified', label: 'Farms', badge: farms.filter(f => f.certified_clean === 1).length },
     { id: 'alerts', label: 'Alerts', badge: safeAlerts.length },
   ]
@@ -788,6 +790,7 @@ export default function AdminPanel({ pendingAction, onActionHandled }) {
       {tab === 'disease' && (statsLoading && !regions.length ? (
         <div style={{ textAlign: 'center', padding: 40 }}><div className="spinner" style={{ margin: '0 auto', width: 28, height: 28 }} /></div>
       ) : <DiseaseTab regions={regions} farms={farms} onUpdate={loadData} />)}
+      {tab === 'analytics' && <DiseaseTrendAnalytics />}
       {tab === 'certified' && <CertifiedFarmsTab farms={farms} />}
       {tab === 'alerts' && <AlertsTab alerts={alerts} />}
       {showProductForm && (

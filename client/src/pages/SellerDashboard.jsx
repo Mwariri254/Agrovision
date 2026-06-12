@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import API_BASE from '../api.js'
+import FarmerDiseaseTrendChart from '../components/FarmerDiseaseTrendChart.jsx'
 import { Plus, Pencil, Archive, Leaf, MapPin, Upload, X, Check, Clock, AlertTriangle, BarChart2, TrendingUp, Eye, DollarSign, ShoppingCart, Star } from 'lucide-react'
 
 const CATEGORIES = ['seed', 'fertiliser', 'produce']
@@ -221,6 +222,12 @@ function AnalyticsTab({ farmId }) {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {farmId && (
+        <div className="card" style={{ padding: '18px 22px' }}>
+          <FarmerDiseaseTrendChart farmId={farmId} farmName="AI Leaf Scan History" />
         </div>
       )}
     </div>

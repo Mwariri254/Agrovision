@@ -9,6 +9,8 @@ import { existsSync } from 'fs'
 import { readFile } from 'fs/promises'
 import db from './db.js'
 import { signToken, requireAuth, optionalAuth, verifyToken } from './auth.js'
+import { adviceHandler } from './routes/chat.js'
+import { diseasesTrendHandler, farmerDiseasesTrendHandler } from './routes/analytics.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const app = express()
@@ -213,10 +215,20 @@ app.post('/api/diagnosis/scan', upload.single('image'), async (req, res) => {
   const { user_id, farm_id, notes } = req.body
   const image_url = req.file ? `/uploads/${req.file.filename}` : null
 
+  // ── Extract GPS coordinates sent by the frontend ──
+  const scan_lat = req.body.latitude  ? parseFloat(req.body.latitude)  : null
+  const scan_lng = req.body.longitude ? parseFloat(req.body.longitude) : null
+  const hasCoords = scan_lat !== null && scan_lng !== null &&
+                    Number.isFinite(scan_lat) && Number.isFinite(scan_lng)
+  // ─────────────────────────────────────────────────
+
   let diagnosis
   try {
     diagnosis = req.file ? await runAiDiagnosis(req.file) : simulateDiagnosis('', 0)
   } catch (err) {
+    if (err.message.includes('Invalid Image')) {
+      return res.status(400).json({ error: err.message })
+    }
     console.warn('AI engine unavailable, using simulated diagnosis:', err.message)
     diagnosis = simulateDiagnosis(req.file?.originalname || '', req.file?.size || 0)
   }
@@ -225,19 +237,90 @@ app.post('/api/diagnosis/scan', upload.single('image'), async (req, res) => {
   const id = randomUUID()
   const now = new Date().toISOString().slice(0, 19).replace('T', ' ')
 
-  db.prepare(`INSERT INTO disease_scans (id, user_id, farm_id, image_url, disease_result, confidence, severity, affected_area_pct, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(id, user_id||null, farm_id||null, image_url, disease_result, confidence, severity, affected_area_pct, notes||null, now)
+  // ── Save scan result including GPS coordinates ──
+  db.prepare(`
+    INSERT INTO disease_scans
+      (id, user_id, farm_id, image_url, disease_result, confidence, severity, affected_area_pct, notes, scan_lat, scan_lng, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id,
+    user_id  || null,
+    farm_id  || null,
+    image_url,
+    disease_result,
+    confidence,
+    severity,
+    affected_area_pct,
+    notes    || null,
+    hasCoords ? scan_lat : null,
+    hasCoords ? scan_lng : null,
+    now
+  )
+  // ───────────────────────────────────────────────
 
-  res.json({ 
-    id, 
-    disease_result, 
-    confidence, 
-    affected_area_pct, 
-    severity, 
-    heatmap, 
-    image_url, 
-    created_at: now 
+  // ── Auto-update Blight Map when disease is found AND we have coordinates ──
+  if (hasCoords && disease_result !== 'healthy') {
+    // Reuse existing inferBuyerRegion() to convert coordinates → county name
+    const region = inferBuyerRegion(scan_lat, scan_lng)
+
+    const existing = db.prepare(`SELECT * FROM region_disease_risk WHERE region = ?`).get(region)
+    const newCount = (existing?.detection_count || 0) + 1
+
+    // Escalation logic: 1 detection = low, 2–4 = watch, 5+ = outbreak
+    const risk_level = newCount >= 5 ? 'outbreak' : newCount >= 2 ? 'watch' : 'safe'
+
+    db.prepare(`
+      INSERT INTO region_disease_risk (region, risk_level, detection_count, blight_type, updated_at)
+      VALUES (?, ?, ?, ?, datetime('now'))
+      ON CONFLICT(region) DO UPDATE SET
+        risk_level      = excluded.risk_level,
+        detection_count = excluded.detection_count,
+        blight_type     = excluded.blight_type,
+        updated_at      = excluded.updated_at
+    `).run(region, risk_level, newCount, disease_result)
+
+    // Create an alert when a region tips into watch or outbreak
+    if (risk_level === 'watch' || risk_level === 'outbreak') {
+      const blightLabel = disease_result === 'late_blight' ? 'Late Blight' : 'Early Blight'
+      const msg = risk_level === 'outbreak'
+        ? `${blightLabel} outbreak in ${region} — ${newCount} GPS-confirmed detections via AgroVision AI.`
+        : `${blightLabel} activity detected in ${region} (${newCount} AI scan detections). Farmers advised to inspect crops.`
+
+      db.prepare(`
+        INSERT INTO disease_alerts (id, region, message, severity, blight_type, simulated_email, simulated_sms, created_at)
+        VALUES (?, ?, ?, ?, ?, 1, 1, datetime('now'))
+      `).run(randomUUID(), region, msg, risk_level, disease_result)
+
+      // Auto-quarantine farm listings if region hits outbreak
+      if (risk_level === 'outbreak') {
+        db.prepare(`SELECT id FROM farms WHERE region = ?`).all(region).forEach(f => {
+          db.prepare(`UPDATE products SET quarantined = 1 WHERE farm_id = ? AND status = 'approved'`).run(f.id)
+        })
+      }
+    }
+
+    console.log(`[Blight Map] ${region} → ${risk_level} (${newCount} detections) | ${disease_result}`)
+  }
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // ── Echo coordinates back so ResultCard badge and PDF report can show them ──
+  res.json({
+    id,
+    disease_result,
+    confidence,
+    affected_area_pct,
+    severity,
+    heatmap,
+    image_url,
+    created_at: now,
+    latitude:  hasCoords ? scan_lat : null,
+    longitude: hasCoords ? scan_lng : null,
   })
 })
+
+app.post('/chat/advice', adviceHandler)
+app.get('/analytics/disease-trends', diseasesTrendHandler)
+app.get('/analytics/farmer/:farmId/disease-trends', farmerDiseasesTrendHandler)
 
 app.get('/api/diagnosis/history', (req, res) => {
   const { user_id, farm_id } = req.query

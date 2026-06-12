@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { Send, Mic, MicOff, Leaf } from 'lucide-react'
+import API_BASE from '../api.js'
 
 const LANG = {
   EN: {
@@ -38,6 +39,21 @@ const LANG = {
   },
 }
 
+const DISEASE_LABELS = {
+  'early blight': 'Early Blight',
+  'late blight': 'Late Blight',
+  'healthy': 'Healthy',
+  'early_blight': 'Early Blight',
+  'late_blight': 'Late Blight'
+}
+
+function mapDiseaseKeyToLabel(key) {
+  if (!key) return ''
+  const trimmed = String(key).trim()
+  const normalized = trimmed.toLowerCase().replace(/[_-]+/g, ' ')
+  return DISEASE_LABELS[trimmed] || DISEASE_LABELS[normalized] || normalized.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
+}
+
 function getBotResponse(text, lang) {
   const t = text.toLowerCase()
   const r = LANG[lang].responses
@@ -70,16 +86,41 @@ function ChatBubble({ msg }) {
   )
 }
 
-export default function AgroBotPage() {
+let lastAutoAskedDisease = null
+
+export default function AgroBotPage({ disease }) {
   const [lang, setLang] = useState('EN')
-  const [messages, setMessages] = useState([
-    { id: 1, role: 'bot', text: LANG.EN.responses.default }
-  ])
+  const [messages, setMessages] = useState(() => (
+    disease
+      ? []
+      : [{ id: 1, role: 'bot', text: LANG.EN.responses.default }]
+  ))
   const [input, setInput] = useState('')
+  const [diseaseInput, setDiseaseInput] = useState('')
   const [thinking, setThinking] = useState(false)
   const [listening, setListening] = useState(false)
   const endRef = useRef(null)
   const recognitionRef = useRef(null)
+  const diseaseAdviceSentRef = useRef(false)
+
+  useEffect(() => {
+    if (disease) {
+      setDiseaseInput(mapDiseaseKeyToLabel(disease))
+      diseaseAdviceSentRef.current = false
+      lastAutoAskedDisease = null
+    }
+  }, [disease])
+
+  useEffect(() => {
+    if (!disease || thinking) return
+    if (messages.some(msg => msg.role === 'user')) return
+    if (diseaseAdviceSentRef.current) return
+    const normalizedDisease = String(disease).trim().toLowerCase()
+    if (normalizedDisease && lastAutoAskedDisease === normalizedDisease) return
+    diseaseAdviceSentRef.current = true
+    lastAutoAskedDisease = normalizedDisease
+    sendMessage('')
+  }, [disease, thinking, lang, messages])
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, thinking])
 
@@ -89,18 +130,41 @@ export default function AgroBotPage() {
     setInput('')
   }
 
-  const sendMessage = (text) => {
-    const t = (text || input).trim()
-    if (!t || thinking) return
-    const userMsg = { id: Date.now(), role: 'user', text: t }
+  const sendMessage = async (text) => {
+    if (thinking) return
+    const question = (text !== undefined ? text : input).trim()
+    const diseaseName = (disease || diseaseInput || '').trim()
+    const diseaseLabel = mapDiseaseKeyToLabel(diseaseName)
+
+    // If user didn't provide a question, this is a proactive advice request and requires a detected disease
+    if (!question) {
+      if (!diseaseName) {
+        alert('Please enter the detected disease name or run the scan first.')
+        return
+      }
+    }
+
+    const userText = question || `Advice for ${diseaseLabel || diseaseName}`
+    const userMsg = { id: Date.now(), role: 'user', text: userText }
     setMessages(m => [...m, userMsg])
     setInput('')
     setThinking(true)
-    setTimeout(() => {
-      const reply = getBotResponse(t, lang)
+
+    try {
+      const response = await fetch(`${API_BASE}/chat/advice`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ disease: diseaseLabel || null, question, lang })
+      })
+      const data = await response.json()
+      const reply = response.ok ? (data.advice || 'I could not generate advice right now.') : (data.error || 'Unable to get advice from the server.')
       setMessages(m => [...m, { id: Date.now() + 1, role: 'bot', text: reply }])
+    } catch (err) {
+      console.error('Chat request failed:', err)
+      setMessages(m => [...m, { id: Date.now() + 1, role: 'bot', text: 'Sorry, I could not reach the advice service right now.' }])
+    } finally {
       setThinking(false)
-    }, 900 + Math.random() * 600)
+    }
   }
 
   const toggleMic = () => {
@@ -120,20 +184,9 @@ export default function AgroBotPage() {
     rec.interimResults = false
     rec.onresult = (e) => {
       const transcript = e.results[0][0].transcript
-      setInput(transcript)
+      setInput('')
       setListening(false)
-      // Auto-send message after successful speech recognition
-      setTimeout(() => {
-        const userMsg = { id: Date.now(), role: 'user', text: transcript }
-        setMessages(m => [...m, userMsg])
-        setInput('')
-        setThinking(true)
-        setTimeout(() => {
-          const reply = getBotResponse(transcript, lang)
-          setMessages(m => [...m, { id: Date.now() + 1, role: 'bot', text: reply }])
-          setThinking(false)
-        }, 900 + Math.random() * 600)
-      }, 100)
+      sendMessage(transcript)
     }
     rec.onerror = () => setListening(false)
     rec.onend = () => setListening(false)
@@ -167,6 +220,32 @@ export default function AgroBotPage() {
               transition: 'all 0.15s',
             }}>{l}</button>
           ))}
+        </div>
+      </div>
+
+      <div style={{ padding: '0 24px 16px', borderBottom: '1px solid var(--border)' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
+          <div style={{ flex: '1 1 320px', minWidth: 240 }}>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text3)', marginBottom: 6 }}>Detected disease</label>
+            <input
+              value={diseaseInput}
+              onChange={e => setDiseaseInput(e.target.value)}
+              placeholder="e.g. early_blight or late_blight"
+              disabled={Boolean(disease)}
+              style={{ width: '100%', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg2)', padding: '10px 12px', color: 'var(--text1)', fontSize: 14 }}
+            />
+          </div>
+          <div style={{ flex: '1 1 240px', minWidth: 220, fontSize: 12, color: 'var(--text3)' }}>
+            {disease ? (
+              <div style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.22)' }}>
+                <strong>Using scan result:</strong> {disease}
+              </div>
+            ) : (
+              <div style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(148,163,184,0.08)', border: '1px solid rgba(148,163,184,0.22)' }}>
+                Enter the detected disease so the advice is specific to your crop.
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
