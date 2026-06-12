@@ -354,12 +354,6 @@ app.patch('/api/products/:id/reject', (req, res) => { db.prepare(`UPDATE product
 app.patch('/api/products/:id/quarantine', (req, res) => { db.prepare(`UPDATE products SET quarantined=1 WHERE id=?`).run(req.params.id); res.json({ success: true }) })
 app.patch('/api/products/:id/unquarantine', (req, res) => { db.prepare(`UPDATE products SET quarantined=0 WHERE id=?`).run(req.params.id); res.json({ success: true }) })
 
-app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }))
-app.use((err, req, res, next) => {
-  console.error('API error:', err)
-  if (req.path.startsWith('/api')) return res.status(err.status || 500).json({ error: err.message || 'Internal server error' })
-  next(err)
-})
 
 // ── REVIEWS ──
 app.get('/api/reviews', (req, res) => {
@@ -556,6 +550,15 @@ app.get('/api/stats', (req, res) => {
   const outbreaks = db.prepare(`SELECT COUNT(*) as count FROM region_disease_risk WHERE risk_level='outbreak'`).get()
   const scans = db.prepare(`SELECT COUNT(*) as count FROM disease_scans`).get()
   res.json({ total: total.count, pending: pending.count, archived: archived.count, quarantined: quarantined.count, certified: certified.count, byCategory, outbreaks: outbreaks.count, scans: scans.count })
+})
+
+app.get('/health', (req, res) => res.status(200).send('OK'))
+
+app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }))
+app.use((err, req, res, next) => {
+  console.error('API error:', err)
+  if (req.path.startsWith('/api')) return res.status(err.status || 500).json({ error: err.message || 'Internal server error' })
+  next(err)
 })
 
 if (process.env.NODE_ENV === 'production') {
