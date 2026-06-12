@@ -15,6 +15,14 @@ export default defineConfig({
       '/uploads': {
         target: 'http://127.0.0.1:3001',
         changeOrigin: true
+      },
+      '/chat': {
+        target: 'http://127.0.0.1:3001',
+        changeOrigin: true
+      },
+      '/analytics': {
+        target: 'http://127.0.0.1:3001',
+        changeOrigin: true
       }
     }
   }

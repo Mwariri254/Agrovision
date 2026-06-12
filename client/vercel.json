@@ -1,5 +1,11 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "framework": "vite"
+  "framework": "vite",
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "https://agrovision-production-8ad8.up.railway.app/api/:path*" },
+    { "source": "/uploads/:path*", "destination": "https://agrovision-production-8ad8.up.railway.app/uploads/:path*" },
+    { "source": "/chat/:path*", "destination": "https://agrovision-production-8ad8.up.railway.app/chat/:path*" },
+    { "source": "/analytics/:path*", "destination": "https://agrovision-production-8ad8.up.railway.app/analytics/:path*" }
+  ]
 }

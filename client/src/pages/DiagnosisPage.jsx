@@ -264,33 +264,39 @@ function ResultCard({ result, onReset, onAskDisease }) {
         <div className="card" style={{ padding: '18px 22px', marginBottom: 16 }}>
           <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}
             ><Zap size={14} color="var(--warning)" /> AI Grad-CAM Heat Map</h3>
-          <div style={{ position: 'relative', borderRadius: 12, overflow: 'hidden', background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', height: 280, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ position: 'relative', borderRadius: 12, overflow: 'hidden', background: '#090d16', height: 320, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {result.image_url ? (
+              <img 
+                src={`${API_BASE}${result.image_url}`} 
+                alt="Leaf scan background" 
+                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity: 0.65 }}
+              />
+            ) : (
+              <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' }} />
+            )}
             <svg style={{ width: '100%', height: '100%', position: 'absolute', inset: 0 }} viewBox="0 0 400 280" preserveAspectRatio="xMidYMid slice">
-              {/* Background leaf shape */}
-              <ellipse cx="200" cy="140" rx="120" ry="100" fill="rgba(255,255,255,0.05)" />
-              
               {/* Heat regions based on affected area */}
               {Array.from({ length: 8 }).map((_, i) => {
                 const angle = (i / 8) * Math.PI * 2
-                const dist = 60 + (result.affected_area_pct / 100) * 40
+                const dist = 40 + (result.affected_area_pct / 100) * 30
                 const x = 200 + Math.cos(angle) * dist
                 const y = 140 + Math.sin(angle) * dist
                 const intensity = Math.max(0, 1 - (i / 8) * 0.3)
                 const heatColor = result.disease_result === 'late_blight' ? '#f87171' : '#f59e0b'
                 return (
-                  <circle key={i} cx={x} cy={y} r="45" fill={heatColor} opacity={intensity * 0.4} filter="url(#glow)" />
+                  <circle key={i} cx={x} cy={y} r="45" fill={heatColor} opacity={intensity * 0.45} filter="url(#glow)" />
                 )
               })}
               
               {/* Severity indicator */}
-              <text x="200" y="50" textAnchor="middle" style={{ fontSize: 18, fontWeight: 700, fill: info.color, opacity: 0.8 }}>
-                {result.affected_area_pct}% coverage
+              <text x="200" y="45" textAnchor="middle" style={{ fontSize: 15, fontWeight: 700, fill: '#ffffff', opacity: 0.9, filter: 'drop-shadow(0px 2px 4px rgba(0,0,0,0.8))' }}>
+                AI Scan Overlay: {result.affected_area_pct}% coverage
               </text>
               
               {/* Glow filter */}
               <defs>
                 <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-                  <feGaussianBlur stdDeviation="8" result="coloredBlur" />
+                  <feGaussianBlur stdDeviation="12" result="coloredBlur" />
                   <feMerge>
                     <feMergeNode in="coloredBlur" />
                     <feMergeNode in="SourceGraphic" />

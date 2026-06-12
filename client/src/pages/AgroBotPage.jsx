@@ -196,7 +196,7 @@ export default function AgroBotPage({ disease }) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 60px)', maxWidth: 820, margin: '0 auto', width: '100%' }}>
+    <div className="chatbot-container" style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 60px)', maxWidth: 820, margin: '0 auto', width: '100%' }}>
 
       {/* Header */}
       <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>

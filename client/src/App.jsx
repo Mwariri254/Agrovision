@@ -306,7 +306,7 @@ export default function App() {
             padding-bottom: 88px !important;
           }
           .chatbot-container {
-            height: calc(100vh - 120px) !important;
+            height: calc(100vh - 140px) !important;
           }
         }
       `}</style>
