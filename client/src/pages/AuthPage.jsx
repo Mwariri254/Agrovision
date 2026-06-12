@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { Sprout, Eye, EyeOff, ArrowRight, User, Mail, Lock } from 'lucide-react'
+import API_BASE from '../api.js'
 
 const AVATAR_COLORS = ['#4ade80', '#60a5fa', '#f59e0b', '#f472b6', '#a78bfa', '#34d399']
 
@@ -15,7 +16,7 @@ export default function AuthPage({ onAuth }) {
     e.preventDefault()
     setLoading(true); setError('')
     try {
-      const endpoint = mode === 'login' ? '/api/auth/login' : '/api/auth/register'
+      const endpoint = mode === 'login' ? `${API_BASE}/api/auth/login` : `${API_BASE}/api/auth/register`
       const body = mode === 'login'
         ? { email: form.email, password: form.password }
         : { name: form.name, email: form.email, password: form.password, role: form.role }

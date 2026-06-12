@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Sprout, ShoppingBasket, ShieldCheck, Map, Bell, Microscope, LogOut, ChevronDown, ClipboardList, MessageSquare } from 'lucide-react'
+import API_BASE from './api.js'
 import Store from './pages/Store.jsx'
 import AdminPanel from './pages/AdminPanel.jsx'
 import FarmMap from './pages/FarmMap.jsx'
@@ -76,7 +77,7 @@ export default function App() {
     if (token && stored) {
       try {
         setUser(JSON.parse(stored))
-        fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } })
+        fetch(`${API_BASE}/api/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
           .then(r => r.ok ? r.json() : null)
           .then(u => { if (u) setUser(u); else logout() })
           .catch(() => {})
@@ -87,7 +88,7 @@ export default function App() {
 
   useEffect(() => {
     if (!user) return
-    const load = () => fetch('/api/alerts').then(r => r.json()).then(setAlerts).catch(() => {})
+    const load = () => fetch(`${API_BASE}/api/alerts`).then(r => r.json()).then(setAlerts).catch(() => {})
     load()
     const t = setInterval(load, 15000)
     return () => clearInterval(t)

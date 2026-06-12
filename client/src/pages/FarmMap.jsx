@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
+import API_BASE from '../api.js'
 import {
   Leaf, MapPin, X, BarChart3, Activity, AlertTriangle,
   Package, Microscope, Award, Phone, Mail, Layers, TrendingUp,
@@ -185,7 +186,7 @@ function FarmerFarmPanel({ farm, onClose }) {
   const riskColor = RISK_COLORS[farm.risk_level] || '#9aa3b8'
 
   useEffect(() => {
-    fetch('/api/products?status=approved')
+    fetch(`${API_BASE}/api/products?status=approved`)
       .then(r => r.json())
       .then(all => { setProducts(all.filter(p => p.farm_id === farm.id && p.quarantined !== 1)); setLoading(false) })
   }, [farm.id])
@@ -199,7 +200,7 @@ function FarmerFarmPanel({ farm, onClose }) {
     navigator.geolocation.getCurrentPosition(async pos => {
       try {
         const { latitude, longitude } = pos.coords
-        const res = await fetch(`/api/farms/${farm.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lat: latitude, lng: longitude }) })
+        const res = await fetch(`${API_BASE}/api/farms/${farm.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lat: latitude, lng: longitude }) })
         if (!res.ok) {
           const txt = await res.text()
           throw new Error(txt || `Failed (${res.status})`)
@@ -284,11 +285,11 @@ function AdminFarmPanel({ farm, onClose }) {
     setLoading(true)
     Promise.all([
       Promise.all(['approved', 'pending', 'archived'].map(s =>
-        fetch(`/api/products?status=${s}`).then(r => r.json())
+        fetch(`${API_BASE}/api/products?status=${s}`).then(r => r.json())
       )).then(lists => lists.flat().filter(p => p.farm_id === farm.id)),
-      fetch(`/api/diagnosis/history?farm_id=${farm.id}`).then(r => r.json()),
-      fetch(`/api/certifications?farm_id=${farm.id}`).then(r => r.json()),
-      fetch(`/api/seller/analytics?farm_id=${farm.id}`).then(r => r.json()),
+      fetch(`${API_BASE}/api/diagnosis/history?farm_id=${farm.id}`).then(r => r.json()),
+      fetch(`${API_BASE}/api/certifications?farm_id=${farm.id}`).then(r => r.json()),
+      fetch(`${API_BASE}/api/seller/analytics?farm_id=${farm.id}`).then(r => r.json()),
     ]).then(([prods, scanList, certList, stats]) => {
       setProducts(prods)
       setScans(scanList)
@@ -540,13 +541,13 @@ export default function FarmMap({ user }) {
       setSelectedFarm(null)
       try {
         if (isAdmin) {
-          const res = await fetch('/api/farms/map?view=admin')
+          const res = await fetch(`${API_BASE}/api/farms/map?view=admin`)
           const data = await res.json()
           if (!res.ok) throw new Error(data.error || `Map data failed (${res.status})`)
           if (cancelled) return
           if (Array.isArray(data)) {
             setFarms(data)
-            const r = await fetch('/api/regions/disease-risk').then(x => x.json())
+            const r = await fetch(`${API_BASE}/api/regions/disease-risk`).then(x => x.json())
             if (!cancelled) { setRegions(Array.isArray(r) ? r : []); setSummary(null) }
           } else {
             setFarms(data.farms || [])
@@ -555,8 +556,8 @@ export default function FarmMap({ user }) {
           }
         } else {
           const [f, r] = await Promise.all([
-            fetch('/api/farms/map').then(x => x.json()),
-            fetch('/api/regions/disease-risk').then(x => x.json()),
+            fetch(`${API_BASE}/api/farms/map`).then(x => x.json()),
+            fetch(`${API_BASE}/api/regions/disease-risk`).then(x => x.json()),
           ])
           if (cancelled) return
           setFarms(Array.isArray(f) ? f : [])
@@ -569,8 +570,8 @@ export default function FarmMap({ user }) {
         setLoadError(err.message || 'Could not load map data')
         try {
           const [f, r] = await Promise.all([
-            fetch('/api/farms/map').then(x => x.json()),
-            fetch('/api/regions/disease-risk').then(x => x.json()),
+            fetch(`${API_BASE}/api/farms/map`).then(x => x.json()),
+            fetch(`${API_BASE}/api/regions/disease-risk`).then(x => x.json()),
           ])
           if (!cancelled) {
             setFarms(Array.isArray(f) ? f : [])

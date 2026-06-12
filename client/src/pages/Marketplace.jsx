@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
+import API_BASE from '../api.js'
 import { Search, SlidersHorizontal, X, ShieldCheck, Leaf, ChevronDown, AlertTriangle, Lock, MapPin, Star, Navigation, Award, CreditCard, Smartphone, Wallet, CheckCircle, ShoppingCart, Trash2, Plus, Minus, Pencil } from 'lucide-react'
 
 const CATEGORIES = ['seed', 'fertiliser', 'produce']
@@ -64,13 +65,13 @@ function ReviewModal({ product, onClose }) {
   const [reviews, setReviews] = useState([])
 
   useEffect(() => {
-    fetch(`/api/reviews?product_id=${product.id}&approved=1`).then(r => r.json()).then(setReviews)
+    fetch(`${API_BASE}/api/reviews?product_id=${product.id}&approved=1`).then(r => r.json()).then(setReviews)
   }, [product.id])
 
   const submit = async (e) => {
     e.preventDefault()
     setSaving(true)
-    await fetch('/api/reviews', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, product_id: product.id }) })
+    await fetch(`${API_BASE}/api/reviews`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, product_id: product.id }) })
     setSaving(false)
     setDone(true)
   }
@@ -157,7 +158,7 @@ function CheckoutModal({ product, buyerLocation, onClose, onPaid }) {
     e.preventDefault()
     setSaving(true)
     setError('')
-    const res = await fetch('/api/checkout', {
+    const res = await fetch(`${API_BASE}/api/checkout`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -278,7 +279,7 @@ function CartModal({ items, buyerLocation, onClose, onUpdateQty, onRemove, onCle
     e.preventDefault()
     setSaving(true)
     setError('')
-    const res = await fetch('/api/checkout-cart', {
+    const res = await fetch(`${API_BASE}/api/checkout-cart`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -457,7 +458,7 @@ export default function Store({ user, onUserUpdate, onAdminAddProduct, onAdminEd
   }, [user?.buyer_lat, user?.buyer_lng, user?.buyer_region, user?.buyer_location])
 
   useEffect(() => {
-    fetch('/api/regions/disease-risk').then(r => r.json()).then(data => {
+    fetch(`${API_BASE}/api/regions/disease-risk`).then(r => r.json()).then(data => {
       const map = {}; data.forEach(r => { map[r.region] = r }); setRegionRisks(map)
     })
   }, [])
@@ -473,7 +474,7 @@ export default function Store({ user, onUserUpdate, onAdminAddProduct, onAdminEd
       if (filters.certified) params.set('certified', 'true')
       params.set('sort', filters.sort)
       if (buyerLoc) { params.set('buyer_lat', buyerLoc.lat); params.set('buyer_lng', buyerLoc.lng) }
-      const res = await fetch(`/api/products?${params}`)
+      const res = await fetch(`${API_BASE}/api/products?${params}`)
       const all = await res.json()
       // Only show fungicides for Early or Late Blight
       const filtered = all.filter(p => p.category === 'fertiliser' && (p.disease_type === 'early_blight' || p.disease_type === 'late_blight'))
@@ -494,7 +495,7 @@ export default function Store({ user, onUserUpdate, onAdminAddProduct, onAdminEd
         setBuyerLoc({ lat, lng, label: localLocationLabel(lat, lng) })
         return
       }
-      const res = await fetch('/api/users/location', {
+      const res = await fetch(`${API_BASE}/api/users/location`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ lat, lng })

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
+import API_BASE from '../api.js'
 import { Plus, Pencil, Archive, Leaf, MapPin, Upload, X, Check, Clock, AlertTriangle, BarChart2, TrendingUp, Eye, DollarSign, ShoppingCart, Star } from 'lucide-react'
 
 const CATEGORIES = ['seed', 'fertiliser', 'produce']
@@ -239,7 +240,7 @@ export default function SellerDashboard() {
   const [locError, setLocError] = useState('')
 
   useEffect(() => {
-    fetch('/api/farms').then(r => r.json()).then(f => { setFarms(f); if (f.length) setSelectedFarm(f[0].id) })
+    fetch(`${API_BASE}/api/farms`).then(r => r.json()).then(f => { setFarms(f); if (f.length) setSelectedFarm(f[0].id) })
     loadProducts()
   }, [])
 
@@ -247,23 +248,23 @@ export default function SellerDashboard() {
     setLoading(true)
     try {
       const [a, p, ar] = await Promise.all([
-        fetch('/api/products?status=approved').then(r => r.json()),
-        fetch('/api/products?status=pending').then(r => r.json()),
-        fetch('/api/products?status=archived').then(r => r.json()),
+        fetch(`${API_BASE}/api/products?status=approved`).then(r => r.json()),
+        fetch(`${API_BASE}/api/products?status=pending`).then(r => r.json()),
+        fetch(`${API_BASE}/api/products?status=archived`).then(r => r.json()),
       ])
       setProducts([...a, ...p, ...ar])
     } finally { setLoading(false) }
   }
 
   const handleSubmit = async (fd) => {
-    if (editing) await fetch(`/api/products/${editing.id}`, { method: 'PUT', body: fd })
-    else await fetch('/api/products', { method: 'POST', body: fd })
+    if (editing) await fetch(`${API_BASE}/api/products/${editing.id}`, { method: 'PUT', body: fd })
+    else await fetch(`${API_BASE}/api/products`, { method: 'POST', body: fd })
     setShowForm(false); setEditing(null); loadProducts()
   }
 
   const handleArchive = async (id) => {
     if (!window.confirm('Archive this product?')) return
-    await fetch(`/api/products/${id}/archive`, { method: 'PATCH' }); loadProducts()
+    await fetch(`${API_BASE}/api/products/${id}/archive`, { method: 'PATCH' }); loadProducts()
   }
 
   const filtered = products.filter(p => {
@@ -297,7 +298,7 @@ export default function SellerDashboard() {
               navigator.geolocation.getCurrentPosition(async pos => {
                 try {
                   const { latitude, longitude } = pos.coords
-                  const res = await fetch(`/api/farms/${selectedFarm}`, {
+                  const res = await fetch(`${API_BASE}/api/farms/${selectedFarm}`, {
                     method: 'PUT', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ lat: latitude, lng: longitude })
                   })
@@ -306,7 +307,7 @@ export default function SellerDashboard() {
                     throw new Error(txt || `Failed (${res.status})`)
                   }
                   // refresh farms list
-                  fetch('/api/farms').then(r => r.ok ? r.json() : []).then(f => { setFarms(f); if (f.length && !selectedFarm) setSelectedFarm(f[0].id) })
+                  fetch(`${API_BASE}/api/farms`).then(r => r.ok ? r.json() : []).then(f => { setFarms(f); if (f.length && !selectedFarm) setSelectedFarm(f[0].id) })
                 } catch (err) {
                   console.error('Set farm location failed', err)
                   setLocError(err.message || 'Location update failed')

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
+import API_BASE from '../api.js'
 import { MapContainer, TileLayer, Circle, Popup } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import { Check, X, ShieldCheck, Leaf, MapPin, Package, Clock, Archive, AlertTriangle, Zap, Bell, Award, Star, Trash2, Plus, Pencil } from 'lucide-react'
@@ -39,7 +40,7 @@ function DiseaseTab({ regions, farms, onUpdate }) {
 
   const save = async () => {
     setSaving(true)
-    await fetch(`/api/regions/disease-risk/${encodeURIComponent(selected)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
+    await fetch(`${API_BASE}/api/regions/disease-risk/${encodeURIComponent(selected)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
     setSaving(false); setSelected(null); onUpdate()
   }
 
@@ -158,19 +159,19 @@ function CertificationTab({ onUpdate }) {
 
   const load = async () => {
     setLoading(true)
-    const [f, c] = await Promise.all([fetch('/api/farms').then(r => r.json()), fetch('/api/certifications').then(r => r.json())])
+    const [f, c] = await Promise.all([fetch(`${API_BASE}/api/farms`).then(r => r.json()), fetch(`${API_BASE}/api/certifications`).then(r => r.json())])
     setFarms(f); setCerts(c); setLoading(false)
   }
   useEffect(() => { load() }, [])
 
   const certify = async (id) => {
     setActing(a => ({...a, [id]: true}))
-    await fetch(`/api/farms/${id}/certify`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ reason: 'AI scan passed — no Early or Late Blight detected' }) })
+    await fetch(`${API_BASE}/api/farms/${id}/certify`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ reason: 'AI scan passed — no Early or Late Blight detected' }) })
     setActing(a => ({...a, [id]: false})); load(); onUpdate()
   }
   const revoke = async (id, blightType) => {
     setActing(a => ({...a, [id]: true}))
-    await fetch(`/api/farms/${id}/revoke`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ reason: `${BLIGHT_LABELS[blightType]} detected by AI diagnosis module`, blight_type: blightType }) })
+    await fetch(`${API_BASE}/api/farms/${id}/revoke`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ reason: `${BLIGHT_LABELS[blightType]} detected by AI diagnosis module`, blight_type: blightType }) })
     setActing(a => ({...a, [id]: false})); load(); onUpdate()
   }
   const [revokeModal, setRevokeModal] = useState(null)
@@ -365,7 +366,7 @@ function ProductsTab({ onEdit, onAdd }) {
   const load = async () => {
     setLoading(true)
     const statuses = ['approved', 'pending', 'archived']
-    const lists = await Promise.all(statuses.map(s => fetch(`/api/products?status=${s}&category=fertiliser`).then(r => r.json())))
+    const lists = await Promise.all(statuses.map(s => fetch(`${API_BASE}/api/products?status=${s}&category=fertiliser`).then(r => r.json())))
     const merged = lists.flat().filter(p => STORE_BLIGHT_TYPES.includes(p.disease_type))
     const byId = new Map()
     merged.forEach(p => byId.set(p.id, p))
@@ -378,14 +379,14 @@ function ProductsTab({ onEdit, onAdd }) {
   const deleteProduct = async (id) => {
     if (!window.confirm('Delete this product permanently?')) return
     setActing(a => ({ ...a, [id]: true }))
-    await fetch(`/api/products/${id}`, { method: 'DELETE' })
+    await fetch(`${API_BASE}/api/products/${id}`, { method: 'DELETE' })
     setActing(a => ({ ...a, [id]: false }))
     load()
   }
 
   const approve = async (id) => {
     setActing(a => ({ ...a, [id]: true }))
-    await fetch(`/api/products/${id}/approve`, { method: 'PATCH' })
+    await fetch(`${API_BASE}/api/products/${id}/approve`, { method: 'PATCH' })
     setActing(a => ({ ...a, [id]: false }))
     load()
   }
@@ -393,7 +394,7 @@ function ProductsTab({ onEdit, onAdd }) {
   const archiveProduct = async (id) => {
     if (!window.confirm('Archive this product? It will be hidden from the store.')) return
     setActing(a => ({ ...a, [id]: true }))
-    await fetch(`/api/products/${id}/archive`, { method: 'PATCH' })
+    await fetch(`${API_BASE}/api/products/${id}/archive`, { method: 'PATCH' })
     setActing(a => ({ ...a, [id]: false }))
     load()
   }
@@ -463,11 +464,11 @@ function ReviewsTab() {
   const [reviews, setReviews] = useState([])
   const [loading, setLoading] = useState(true)
 
-  const load = () => { fetch('/api/reviews').then(r => r.json()).then(d => { setReviews(d); setLoading(false) }) }
+  const load = () => { fetch(`${API_BASE}/api/reviews`).then(r => r.json()).then(d => { setReviews(d); setLoading(false) }) }
   useEffect(() => { load() }, [])
 
-  const remove = async id => { await fetch(`/api/reviews/${id}`, { method: 'DELETE' }); load() }
-  const setApproval = async (id, approved) => { await fetch(`/api/reviews/${id}/${approved ? 'approve' : 'reject'}`, { method: 'PATCH' }); load() }
+  const remove = async id => { await fetch(`${API_BASE}/api/reviews/${id}`, { method: 'DELETE' }); load() }
+  const setApproval = async (id, approved) => { await fetch(`${API_BASE}/api/reviews/${id}/${approved ? 'approve' : 'reject'}`, { method: 'PATCH' }); load() }
 
   return (
     <div>
@@ -610,10 +611,10 @@ export default function AdminPanel({ pendingAction, onActionHandled }) {
     setStatsLoading(true)
     try {
       const [s, r, a, f] = await Promise.all([
-        fetch('/api/stats').then(r=>r.json()),
-        fetch('/api/regions/disease-risk').then(r=>r.json()),
-        fetch('/api/alerts').then(r=>r.json()),
-        fetch('/api/farms').then(r=>r.json()),
+        fetch(`${API_BASE}/api/stats`).then(r=>r.json()),
+        fetch(`${API_BASE}/api/regions/disease-risk`).then(r=>r.json()),
+        fetch(`${API_BASE}/api/alerts`).then(r=>r.json()),
+        fetch(`${API_BASE}/api/farms`).then(r=>r.json()),
       ])
       setStats(s); setRegions(r); setAlerts(a); setFarms(f)
     } finally { setStatsLoading(false) }
@@ -703,7 +704,7 @@ export default function AdminPanel({ pendingAction, onActionHandled }) {
 
       let productId = editingProduct?.id
       if (editingProduct) {
-        const res = await fetch(`/api/products/${editingProduct.id}`, { method: 'PUT', body: fd })
+        const res = await fetch(`${API_BASE}/api/products/${editingProduct.id}`, { method: 'PUT', body: fd })
         let updated
         try {
           updated = await res.json()
@@ -714,7 +715,7 @@ export default function AdminPanel({ pendingAction, onActionHandled }) {
         if (!res.ok) throw new Error(updated.error || `Update failed (${res.status})`)
         productId = updated.id || editingProduct.id
       } else {
-        const res = await fetch('/api/products', { method: 'POST', body: fd })
+        const res = await fetch(`${API_BASE}/api/products`, { method: 'POST', body: fd })
         let created
         try {
           created = await res.json()
@@ -727,7 +728,7 @@ export default function AdminPanel({ pendingAction, onActionHandled }) {
         productId = created.id
       }
 
-      const approveRes = await fetch(`/api/products/${productId}/approve`, { method: 'PATCH' })
+      const approveRes = await fetch(`${API_BASE}/api/products/${productId}/approve`, { method: 'PATCH' })
       const approved = await approveRes.json()
       if (!approveRes.ok) {
         throw new Error(approved.error || `Approve failed (${approveRes.status})`)

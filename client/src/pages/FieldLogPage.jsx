@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import API_BASE from '../api.js'
 import { ClipboardList, Leaf, AlertTriangle, RefreshCw, Calendar, ChevronRight, TrendingUp } from 'lucide-react'
 
 const DISEASE_META = {
@@ -122,7 +123,7 @@ export default function FieldLogPage({ user }) {
     if (refresh) setRefreshing(true)
     try {
       const token = localStorage.getItem('fm_token')
-      const res = await fetch('/api/diagnosis/history', { headers: { Authorization: `Bearer ${token}` } })
+      const res = await fetch(`${API_BASE}/api/diagnosis/history`, { headers: { Authorization: `Bearer ${token}` } })
       const data = await res.json()
       setScans(Array.isArray(data) ? data : [])
     } catch { setScans([]) }

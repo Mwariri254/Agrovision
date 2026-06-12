@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { Camera, Upload, X, Leaf, AlertTriangle, CheckCircle, Zap, ChevronDown, Clock, RefreshCw, Zap as HeatIcon } from 'lucide-react'
+import API_BASE from '../api.js'
 
 const DISEASE_INFO = {
   healthy: {
@@ -223,7 +224,7 @@ export default function DiagnosisPage({ user }) {
   const streamRef = useRef()
 
   useEffect(() => {
-    fetch('/api/diagnosis/history').then(r => r.json()).then(d => setHistory(d)).catch(() => {})
+    fetch(`${API_BASE}/api/diagnosis/history`).then(r => r.json()).then(d => setHistory(d)).catch(() => {})
   }, [])
 
   const handleFile = file => {
@@ -265,7 +266,7 @@ export default function DiagnosisPage({ user }) {
       const fd = new FormData()
       fd.append('image', image)
       if (user?.id) fd.append('user_id', user.id)
-      const res = await fetch('/api/diagnosis/scan', { method: 'POST', body: fd })
+      const res = await fetch(`${API_BASE}/api/diagnosis/scan`, { method: 'POST', body: fd })
       const data = await res.json()
       setResult(data)
       setHistory(h => [data, ...h.slice(0, 9)])

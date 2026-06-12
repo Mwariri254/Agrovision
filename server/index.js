@@ -10,9 +10,12 @@ import { signToken, requireAuth, optionalAuth, verifyToken } from './auth.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const app = express()
-const PORT = 3001
+const PORT = process.env.PORT || 3001
 
-app.use(cors())
+app.use(cors({
+  origin: process.env.CLIENT_URL || '*',
+  credentials: true
+}))
 app.use(express.json())
 app.use('/uploads', express.static(join(__dirname, 'uploads')))
 
@@ -560,3 +563,4 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 app.listen(PORT, '0.0.0.0', () => console.log(`FarmMarket API running on port ${PORT}`))
+
