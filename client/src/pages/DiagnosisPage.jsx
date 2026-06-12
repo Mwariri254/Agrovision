@@ -265,9 +265,9 @@ function ResultCard({ result, onReset, onAskDisease }) {
           <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}
             ><Zap size={14} color="var(--warning)" /> AI Grad-CAM Heat Map</h3>
           <div style={{ position: 'relative', borderRadius: 12, overflow: 'hidden', background: '#090d16', height: 320, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {result.image_url ? (
+            {preview || result.image_url ? (
               <img 
-                src={`${API_BASE}${result.image_url}`} 
+                src={preview || `${API_BASE}${result.image_url}`} 
                 alt="Leaf scan background" 
                 style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity: 0.65 }}
               />
