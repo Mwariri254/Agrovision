@@ -1,0 +1,33 @@
+node_modules/
+client/node_modules/
+client/dist/
+.local/
+
+# SQLite databases
+**/*.db
+**/*.db-shm
+**/*.db-wal
+
+# Uploaded files
+**/uploads/
+
+# AI model weights (large binary files)
+**/*.h5
+**/*.pt
+**/*.pkl
+
+# Zip archives
+*.zip
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
