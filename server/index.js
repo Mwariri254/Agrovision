@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url'
 import { dirname, join, extname } from 'path'
 import { randomUUID } from 'crypto'
 import bcrypt from 'bcryptjs'
+import { existsSync } from 'fs'
 import db from './db.js'
 import { signToken, requireAuth, optionalAuth, verifyToken } from './auth.js'
 
@@ -558,8 +559,13 @@ app.get('/api/stats', (req, res) => {
 })
 
 if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(join(__dirname, '../client/dist')))
-  app.get('*', (req, res) => res.sendFile(join(__dirname, '../client/dist/index.html')))
+  const distPath = join(__dirname, '../client/dist')
+  if (existsSync(distPath)) {
+    app.use(express.static(distPath))
+    app.get('*', (req, res) => res.sendFile(join(distPath, 'index.html')))
+  } else {
+    console.log('Production mode: client/dist not found. Serving as API-only backend.')
+  }
 }
 
 app.listen(PORT, '0.0.0.0', () => console.log(`FarmMarket API running on port ${PORT}`))
