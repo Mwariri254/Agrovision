@@ -6,6 +6,7 @@ import { dirname, join, extname } from 'path'
 import { randomUUID } from 'crypto'
 import bcrypt from 'bcryptjs'
 import { existsSync } from 'fs'
+import { readFile } from 'fs/promises'
 import db from './db.js'
 import { signToken, requireAuth, optionalAuth, verifyToken } from './auth.js'
 
@@ -99,6 +100,53 @@ function simulateDiagnosis(filename = '', fileSize = 0) {
   return { disease_result, confidence, affected_area_pct, severity }
 }
 
+const AI_ENGINE_URL = process.env.AI_ENGINE_URL || 'http://127.0.0.1:5002'
+
+function mapAiDiagnosis(label = '') {
+  const normalized = label.toLowerCase().replace(/\s+/g, '_')
+  if (normalized.includes('early')) return 'early_blight'
+  if (normalized.includes('late')) return 'late_blight'
+  return 'healthy'
+}
+
+function severityFromCoverage(affected_area_pct) {
+  if (affected_area_pct <= 0) return 'none'
+  if (affected_area_pct < 20) return 'mild'
+  if (affected_area_pct < 50) return 'moderate'
+  return 'severe'
+}
+
+async function runAiDiagnosis(file) {
+  const fileBuffer = await readFile(file.path)
+  const formData = new FormData()
+  formData.append('file', new Blob([fileBuffer], { type: file.mimetype || 'application/octet-stream' }), file.originalname)
+
+  const response = await fetch(`${AI_ENGINE_URL}/predict`, { method: 'POST', body: formData })
+
+  if (!response.ok) {
+    let errorMsg = `AI engine responded with ${response.status}`
+    try {
+      const errData = await response.json()
+      if (errData.error) errorMsg = errData.error
+    } catch(e) {}
+    throw new Error(errorMsg)
+  }
+
+  const data = await response.json()
+  if (!data.success) throw new Error(data.error || 'AI engine prediction failed')
+
+  const disease_result = mapAiDiagnosis(data.diagnosis)
+  const affected_area_pct = disease_result === 'healthy' ? 0 : Math.round(Number(data.affected_area_pct) || 0)
+
+  return {
+    disease_result,
+    confidence: Math.round(Number(data.confidence) || 0),
+    affected_area_pct,
+    severity: severityFromCoverage(affected_area_pct),
+    heatmap: data.heatmap || null,
+  }
+}
+
 // ── AUTH ──
 app.post('/api/auth/register', async (req, res) => {
   try {
@@ -161,14 +209,34 @@ app.put('/api/users/location', requireAuth, (req, res) => {
 })
 
 // ── DISEASE DIAGNOSIS / AI SCAN ──
-app.post('/api/diagnosis/scan', upload.single('image'), (req, res) => {
+app.post('/api/diagnosis/scan', upload.single('image'), async (req, res) => {
   const { user_id, farm_id, notes } = req.body
   const image_url = req.file ? `/uploads/${req.file.filename}` : null
-  const { disease_result, confidence, affected_area_pct, severity } = simulateDiagnosis(req.file?.originalname || '', req.file?.size || 0)
+
+  let diagnosis
+  try {
+    diagnosis = req.file ? await runAiDiagnosis(req.file) : simulateDiagnosis('', 0)
+  } catch (err) {
+    console.warn('AI engine unavailable, using simulated diagnosis:', err.message)
+    diagnosis = simulateDiagnosis(req.file?.originalname || '', req.file?.size || 0)
+  }
+
+  const { disease_result, confidence, affected_area_pct, severity, heatmap = null } = diagnosis
   const id = randomUUID()
   const now = new Date().toISOString().slice(0, 19).replace('T', ' ')
+
   db.prepare(`INSERT INTO disease_scans (id, user_id, farm_id, image_url, disease_result, confidence, severity, affected_area_pct, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(id, user_id||null, farm_id||null, image_url, disease_result, confidence, severity, affected_area_pct, notes||null, now)
-  res.json({ id, disease_result, confidence, affected_area_pct, severity, image_url, created_at: now })
+
+  res.json({ 
+    id, 
+    disease_result, 
+    confidence, 
+    affected_area_pct, 
+    severity, 
+    heatmap, 
+    image_url, 
+    created_at: now 
+  })
 })
 
 app.get('/api/diagnosis/history', (req, res) => {
